@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="6f50accf-958b-480c-82ac-06499b07e4d8" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" password="12345" database="muletrainingdb" />
+	</db:config>
+	<flow name="objectstore-conceptFlow" doc:id="6330cf2b-8408-4461-9477-2e5c26d90278" >
+		<scheduler doc:name="Scheduler" doc:id="5c4ffc4a-a19a-4ae4-bbf3-9d4f80c8f7ea" >
+			<scheduling-strategy >
+				<fixed-frequency />
+			</scheduling-strategy>
+		</scheduler>
+		<os:retrieve doc:name="Retrieve" doc:id="2c54678d-ae71-490b-a6fa-a3eb58efe292" key="lastproductid" target="lastproduct">
+			<os:default-value ><![CDATA[#[0]]]></os:default-value>
+		</os:retrieve>
+		<db:select doc:name="Select" doc:id="86dcfd63-b73b-43a0-a112-2e107e6ae860" config-ref="Database_Config">
+			<db:sql ><![CDATA[select *from product where product_id >:lastproductid]]></db:sql>
+			<db:input-parameters ><![CDATA[#[%dw 2.0
+output application/java
+---
+{
+	lastproductid: vars.lastproduct as String
+}]]]></db:input-parameters>
+		</db:select>
+		<choice doc:name="Choice" doc:id="f3526003-753e-4cc2-845e-06d84630eacd" >
+			<when expression="#[not isEmpty(payload)]">
+				<ee:transform doc:name="Transform Message" doc:id="babad524-793a-489d-83c8-184fa2f4d7ed" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="80f2bb61-f9d9-4d1f-ba60-194b5189c100" message="#[payload]"/>
+				<os:store doc:name="Store" doc:id="8534dd94-ad4a-4467-8c22-3697e36b07c9" key="lastproductid">
+					<os:value ><![CDATA[#[max(payload.product_id)]]]></os:value>
+				</os:store>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="a78f62dc-fe61-4beb-981c-ae2ae5ac113f" message="no new entry"/>
+			</otherwise>
+		</choice>
+	</flow>
+</mule>
